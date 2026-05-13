@@ -43,10 +43,9 @@ def main_menu():
 @bot.message_handler(commands=['start'])
 def start(m):
     if not joined(m.from_user.id):
-        bot.send_message(m.chat.id,"تکایە سەرەتا جۆینی چەناڵ بکە",reply_markup=join_menu())
+        bot.send_message(m.chat.id,"جۆینی چەناڵ بکە",reply_markup=join_menu())
     else:
-        bot.send_message(m.chat.id,
-"""╭━━━━━━━━━━━━━━━━━━━
+        bot.send_message(m.chat.id,"""╭━━━━━━━━━━━━━━━━━━━
 
 ئەزیزم بەخێر بیت بەشێک هەڵبژێرە 😘
 
@@ -59,8 +58,6 @@ def call(c):
     if c.data=="check":
         if joined(c.from_user.id):
             bot.send_message(c.message.chat.id,"جۆین کرا ✅",reply_markup=main_menu())
-        else:
-            bot.answer_callback_query(c.id,"هێشتا جۆینت نەکردووە")
     elif c.data in videos:
         for v in videos[c.data]:
             bot.send_video(c.message.chat.id,v)
@@ -73,9 +70,8 @@ def add(m):
 
 def getcat(m):
     cat=m.text
-    if cat in buttons:
-        msg=bot.reply_to(m,"ڤیدیۆ بنێرە")
-        bot.register_next_step_handler(msg,savevideo,cat)
+    msg=bot.reply_to(m,"ڤیدیۆ بنێرە")
+    bot.register_next_step_handler(msg,savevideo,cat)
 
 def savevideo(m,cat):
     if m.video:
@@ -86,11 +82,18 @@ def savevideo(m,cat):
 @bot.message_handler(commands=['del'])
 def delete(m):
     if m.from_user.id==ADMIN_ID:
-        x=m.text.replace("/del ","")
-        if x in videos and videos[x]:
-            videos[x].pop()
-            save()
-            bot.reply_to(m,"سڕایەوە ✅")
+        cat=m.text.replace("/del ","")
+        if cat in videos:
+            msg="ڤیدیۆکان:\n"
+            for i in range(len(videos[cat])):
+                msg+=f"{i+1}\n"
+            x=bot.reply_to(m,msg+"\nژمارە بنێرە")
+            bot.register_next_step_handler(x,remove_video,cat)
 
-print("started")
+def remove_video(m,cat):
+    i=int(m.text)-1
+    videos[cat].pop(i)
+    save()
+    bot.reply_to(m,"سڕایەوە ✅")
+
 bot.infinity_polling()
