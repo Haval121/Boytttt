@@ -1,99 +1,22 @@
-import telebot
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
-import json, os
+import os import requests from telegram import Update from telegram.ext import Application, MessageHandler, filters, ContextTypes
 
-TOKEN = "8197236990:AAGPM5Wxb-a6DjMOwLh5HqlMvsVKvGPiBFs"
-ADMIN_ID = 5313754716
-CHANNEL = "@pamay_cts"
+BOT_TOKEN = "PUT_YOUR_TELEGRAM_BOT_TOKEN" API_KEY = "c3421c6a-c1d6-463a-aa9c-d817727e18c3" API_URL = "https://api.example.com/process"  # گۆڕە بۆ API URL ـی ڕاستەقینە
 
-bot = telebot.TeleBot(TOKEN)
+async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE): photo = update.message.photo[-1] file = await context.bot.get_file(photo.file_id) image_url = file.file_path
 
-buttons = ["کورد","مناڵ","کامێرای چاودێری","مەلف","بیانی"]
+payload = {
+    "api_key": API_KEY,
+    "image_url": image_url
+}
 
-if not os.path.exists("videos.json"):
-    with open("videos.json","w") as f:
-        json.dump({x:[] for x in buttons},f)
+r = requests.post(API_URL, json=payload)
 
-with open("videos.json","r") as f:
-    videos=json.load(f)
+if r.status_code == 200:
+    result = r.json().get("result_url")
+    await update.message.reply_photo(result)
+else:
+    await update.message.reply_text("هەڵەیەک ڕوویدا")
 
-def save():
-    with open("videos.json","w") as f:
-        json.dump(videos,f)
+def main(): app = Application.builder().token(BOT_TOKEN).build() app.add_handler(MessageHandler(filters.PHOTO, handle_photo)) app.run_polling()
 
-def joined(user):
-    try:
-        s=bot.get_chat_member(CHANNEL,user).status
-        return s in ["member","administrator","creator"]
-    except:
-        return False
-
-def join_menu():
-    kb=InlineKeyboardMarkup()
-    kb.add(InlineKeyboardButton("چوونە ناو چەناڵ",url="https://t.me/pamay_cts"))
-    kb.add(InlineKeyboardButton("جۆینم کرد",callback_data="check"))
-    return kb
-
-def main_menu():
-    kb=InlineKeyboardMarkup()
-    for b in buttons:
-        kb.add(InlineKeyboardButton(b,callback_data=b))
-    return kb
-
-@bot.message_handler(commands=['start'])
-def start(m):
-    if not joined(m.from_user.id):
-        bot.send_message(m.chat.id,"جۆینی چەناڵ بکە",reply_markup=join_menu())
-    else:
-        bot.send_message(m.chat.id,"""╭━━━━━━━━━━━━━━━━━━━
-
-ئەزیزم بەخێر بیت بەشێک هەڵبژێرە 😘
-
-╰━━━━━━━━━━━━━━━━
-
-بۆ بینی ڤیدۆ بەشک هەڵبژێرە👇""",reply_markup=main_menu())
-
-@bot.callback_query_handler(func=lambda c:True)
-def call(c):
-    if c.data=="check":
-        if joined(c.from_user.id):
-            bot.send_message(c.message.chat.id,"جۆین کرا ✅",reply_markup=main_menu())
-    elif c.data in videos:
-        for v in videos[c.data]:
-            bot.send_video(c.message.chat.id,v)
-
-@bot.message_handler(commands=['add'])
-def add(m):
-    if m.from_user.id==ADMIN_ID:
-        msg=bot.reply_to(m,"ناوی بەش بنێرە")
-        bot.register_next_step_handler(msg,getcat)
-
-def getcat(m):
-    cat=m.text
-    msg=bot.reply_to(m,"ڤیدیۆ بنێرە")
-    bot.register_next_step_handler(msg,savevideo,cat)
-
-def savevideo(m,cat):
-    if m.video:
-        videos[cat].append(m.video.file_id)
-        save()
-        bot.reply_to(m,"زیادکرا ✅")
-
-@bot.message_handler(commands=['del'])
-def delete(m):
-    if m.from_user.id==ADMIN_ID:
-        cat=m.text.replace("/del ","")
-        if cat in videos:
-            msg="ڤیدیۆکان:\n"
-            for i in range(len(videos[cat])):
-                msg+=f"{i+1}\n"
-            x=bot.reply_to(m,msg+"\nژمارە بنێرە")
-            bot.register_next_step_handler(x,remove_video,cat)
-
-def remove_video(m,cat):
-    i=int(m.text)-1
-    videos[cat].pop(i)
-    save()
-    bot.reply_to(m,"سڕایەوە ✅")
-
-bot.infinity_polling()
+if name == "main": main()
