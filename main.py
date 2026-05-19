@@ -18,7 +18,7 @@ from telegram.ext import (
 )
 
 TOKEN = "8197236990:AAEZYdLrnnattTanBeUUTtqz9f_4tm0sB4s"
-BOT_USERNAME = "YourBotUsername"  # <-- ناوی بۆتەکەت لێرە بنووسە بەبێ @
+BOT_USERNAME = "pamay_c_bot"
 
 logging.basicConfig(level=logging.INFO)
 
@@ -91,15 +91,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             waiting_for_partner[user] = token
             await update.message.reply_text(
                 "✅ لینکەکە کارا بوو!\n\n"
-                "ئێستا ویدیۆی خۆت بنێرە تا ئاڵۆگۆری ویدیۆ بکەین."
+                "ئێستا ڤیدیۆی خۆت بنێرە تا ئاڵۆگۆری ڤیدیۆ بکەین."
             )
         else:
             await update.message.reply_text("❌ ئەم لینکە کار نادات یان بەسەرچووە.")
     else:
         await update.message.reply_text(
             "سڵاو! 👋\n\n"
-            "ویدیۆی خۆت بنێرە، لینکێک وەردەگریت.\n"
-            "ئەو لینکە بنێرە بۆ ئەو کەسەی دەتەوێت ویدیۆی لەگەڵدا گۆڕبکەیت."
+            "ڤیدیۆی خۆت بنێرە، لینکێک وەردەگریت.\n"
+            "ئەو لینکە بنێرە بۆ ئەو کەسەی دەتەوێت ڤیدیۆی لەگەڵدا ئاڵوگۆڕبکەیت."
         )
 
 
