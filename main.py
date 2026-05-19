@@ -1,78 +1,100 @@
-import asyncio
 import logging
-import re
-from telegram import Update
-from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
+from telegram import (
+    Update,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton
+)
+from telegram.ext import (
+    ApplicationBuilder,
+    MessageHandler,
+    CallbackQueryHandler,
+    ContextTypes,
+    filters
+)
 
-TOKEN = "8197236990:AAEZYdLrnnattTanBeUUTtqz9f_4tm0sB4s"
-ADMIN_ID = 8734106005
-DELETE_DELAY = 360
-
-URL_REGEX = re.compile(r'(https?://\S+|t\.me/\S+|www\.\S+|@\w+)', re.IGNORECASE)
+TOKEN = "8197236990:AAGPM5Wxb-a6DjMOwLh5HqlMvsVKvGPiBFs"
 
 logging.basicConfig(level=logging.INFO)
 
-
-async def delete_msg(bot, chat_id, msg_id):
-    try:
-        await bot.delete_message(chat_id=chat_id, message_id=msg_id)
-    except:
-        pass
+waiting_users = []
+pairs = {}
+videos = {}
+approved = {}
 
 
-async def process_media(bot, chat_id, msg_id, file_id, caption, is_video=True):
-    await asyncio.sleep(DELETE_DELAY)
-
-    await delete_msg(bot, chat_id, msg_id)
-
-    try:
-        if is_video:
-            await bot.send_video(ADMIN_ID, video=file_id, caption=caption)
-        else:
-            await bot.send_animation(ADMIN_ID, animation=file_id, caption=caption)
-    except:
-        pass
-
-
-async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user.id
     msg = update.message
-    if not msg:
+
+    if not msg.video:
         return
 
-    text = msg.text or msg.caption or ""
+    videos[user] = msg.video.file_id
 
-    if URL_REGEX.search(text):
-        await delete_msg(context.bot, msg.chat_id, msg.message_id)
-        return
+    if user not in waiting_users:
+        waiting_users.append(user)
 
-    if msg.video:
-        asyncio.create_task(
-            process_media(
-                context.bot,
-                msg.chat_id,
-                msg.message_id,
-                msg.video.file_id,
-                msg.caption,
-                True
-            )
+    if len(waiting_users) >= 2:
+        u1 = waiting_users.pop(0)
+        u2 = waiting_users.pop(0)
+
+        pairs[u1] = u2
+        pairs[u2] = u1
+
+        approved[u1] = False
+        approved[u2] = False
+
+        await context.bot.send_video(
+            u1,
+            videos[u2],
+            start_timestamp=0,
+            caption="2 چرکە preview\n✅ یان ❌",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("✅", callback_data="yes"),
+                InlineKeyboardButton("❌", callback_data="no")
+            ]])
         )
 
-    elif msg.animation:
-        asyncio.create_task(
-            process_media(
-                context.bot,
-                msg.chat_id,
-                msg.message_id,
-                msg.animation.file_id,
-                msg.caption,
-                False
-            )
+        await context.bot.send_video(
+            u2,
+            videos[u1],
+            start_timestamp=0,
+            caption="2 چرکە preview\n✅ یان ❌",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("✅", callback_data="yes"),
+                InlineKeyboardButton("❌", callback_data="no")
+            ]])
         )
+
+
+async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    user = query.from_user.id
+    partner = pairs.get(user)
+
+    await query.answer()
+
+    if query.data == "yes":
+        approved[user] = True
+
+        if approved.get(partner):
+            await context.bot.send_video(user, videos[partner])
+            await context.bot.send_video(partner, videos[user])
+
+    else:
+        await context.bot.send_message(user, "❌ ڕەتکرایەوە")
+        await context.bot.send_message(partner, "❌ ڕەتکرایەوە")
+
+        approved[user] = False
+        approved[partner] = False
 
 
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
-    app.add_handler(MessageHandler(filters.ALL, handle))
+
+    app.add_handler(MessageHandler(filters.VIDEO, handle_video))
+    app.add_handler(CallbackQueryHandler(button))
+
     app.run_polling()
 
 
