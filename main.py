@@ -34,9 +34,7 @@ def trim_video(input_path: str, output_path: str, duration: int = 2):
         "ffmpeg", "-y",
         "-i", input_path,
         "-t", str(duration),
-        "-vcodec", "libx264",
-        "-acodec", "aac",
-        "-strict", "experimental",
+        "-c", "copy",
         output_path
     ], capture_output=True)
     if result.returncode != 0:
@@ -109,4 +107,89 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "سڵاو! 👋\n\n"
             "ویدیۆی خۆت بنێرە، لینکێک وەردەگریت.\n"
-            "ئەو لینکە بنێرە بۆ ئە
+            "ئەو لینکە بنێرە بۆ ئەو کەسەی دەتەوێت ویدیۆی لەگەڵدا گۆڕبکەیت."
+        )
+
+
+async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user.id
+    msg = update.message
+
+    if not msg.video:
+        return
+
+    videos[user] = msg.video.file_id
+
+    if user in waiting_for_partner:
+        token = waiting_for_partner.pop(user)
+        if token in pending_invites:
+            inviter = pending_invites.pop(token)
+
+            if inviter not in videos:
+                await update.message.reply_text("❌ ئەو کەسەی لینکەکەی نێردووە هێشتا ویدیۆی نێردوونی.")
+                return
+
+            pairs[user] = inviter
+            pairs[inviter] = user
+            approved[user] = False
+            approved[inviter] = False
+
+            await update.message.reply_text("✅ ویدیۆت وەرگیرا! پریڤیووی یەکتری دەنێرین...")
+            await context.bot.send_message(inviter, "✅ ئەو کەسەی لینکەکەت نێردووە ویدیۆی نێرد! پریڤیووی یەکتری دەنێرین...")
+
+            await send_previews(context, inviter, user)
+        return
+
+    token = str(uuid.uuid4())[:8]
+    pending_invites[token] = user
+
+    link = f"https://t.me/{BOT_USERNAME}?start={token}"
+
+    await update.message.reply_text(
+        f"✅ ویدیۆت وەرگیرا!\n\n"
+        f"ئەم لینکەی خوارەوە بنێرە بۆ ئەو کەسەی دەتەوێت ویدیۆی لەگەڵدا گۆڕبکەیت:\n\n"
+        f"`{link}`",
+        parse_mode="Markdown"
+    )
+
+
+async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    user = query.from_user.id
+    partner = pairs.get(user)
+
+    await query.answer()
+
+    if query.data == "yes":
+        approved[user] = True
+
+        if approved.get(partner):
+            await context.bot.send_video(user, videos[partner])
+            await context.bot.send_video(partner, videos[user])
+            await context.bot.send_message(user, "✅ هەردووکتان قبووڵتان کرد! ویدیۆی تەواو بینە.")
+            await context.bot.send_message(partner, "✅ هەردووکتان قبووڵتان کرد! ویدیۆی تەواو بینە.")
+        else:
+            await context.bot.send_message(user, "✅ تۆ قبووڵت کرد، چاوەڕوانی بەکارهێنەرەکەی دیکەی بکە...")
+
+    else:
+        await context.bot.send_message(user, "❌ ڕەتت کردەوە.")
+        if partner:
+            await context.bot.send_message(partner, "❌ بەکارهێنەرەکەی دیکە ڕەتی کردەوە.")
+
+        approved[user] = False
+        if partner:
+            approved[partner] = False
+
+
+def main():
+    app = ApplicationBuilder().token(TOKEN).build()
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.VIDEO, handle_video))
+    app.add_handler(CallbackQueryHandler(button))
+
+    app.run_polling()
+
+
+if __name__ == "__main__":
+    main()
