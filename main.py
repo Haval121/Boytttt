@@ -1,6 +1,6 @@
 import os import uuid import asyncio import subprocess from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 
-TOKEN = os.getenv"8197236990:AAGPM5Wxb-a6DjMOwLh5HqlMvsVKvGPiBFs" BOT_NAME = "pamay_c_bot" rooms = {}
+TOKEN = "8197236990:AAGPM5Wxb-a6DjMOwLh5HqlMvsVKvGPiBFs" BOT_NAME = "pamay_c_bot" rooms = {}
 
 def make_preview(video_path, out): subprocess.run([ "ffmpeg", "-i", video_path, "-t", "2", "-c:v", "libx264", "-c:a", "aac", "-y", out ], check=True)
 
