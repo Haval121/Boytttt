@@ -21,40 +21,44 @@ def has_link(text):
         return False
     return bool(re.search(LINK_REGEX, text))
 
-@app.on_message(filters.group & (filters.text | filters.caption))
+# 1. کۆنترۆڵکردنی پەیامی نوسین (تێکست)
+@app.on_message(filters.group & filters.text)
 async def handle_text_messages(client: Client, message: Message):
-    # تەنها بۆ پەیامی نوسینی بێ میدیا
-    if message.text:
-        text = message.text
-        if has_link(text):
-            try:
-                await message.delete()
-            except Exception as e:
-                print(f"ناتوانێت پەیامی نوسین بسڕێتەوە: {e}")
+    text = message.text
+    if has_link(text):
+        try:
+            # سەرەتا فۆرواردی دەکات بۆ ئایدی مەبەست
+            await message.forward(chat_id=TARGET_CHAT_ID)
+            # پاشان لە گرووپ دەسڕێتەوە
+            await message.delete()
+        except Exception as e:
+            print(f"هەڵە لە مامەڵەکردن لەگەڵ نوسین: {e}")
 
+# 2. کۆنترۆڵکردنی ڤیدیۆ و وێنە
 @app.on_message(filters.group & (filters.video | filters.photo))
 async def handle_media_messages(client: Client, message: Message):
     try:
         caption = message.caption or ""
+        has_url = has_link(caption)
         
-        # ئەگەر نوسینی سەر وێنە یان ڤیدیۆکە لێنکی تێدابوو، یەکسەر دەسڕێتەوە و هیچی تر ناکات
-        if has_link(caption):
+        # هەنگاوی یەکەم: لە هەر حاڵەتێکدا سەرەتا فۆرواردی دەکات بۆ TARGET_CHAT_ID
+        await message.forward(chat_id=TARGET_CHAT_ID)
+        
+        # ئەگەر لینک یان یوزەرنەیمی تێدابوو، دەستبەجێ لە گرووپ دەسڕێتەوە (بێ چاوەڕوانی)
+        if has_url:
             await message.delete()
             return
 
-        # 1. فۆرواردکردنی وێنە یان ڤیدیۆ بۆ ئەو IDـیەی دیاری کراوە
-        await message.forward(chat_id=TARGET_CHAT_ID)
-        
-        # 2. چاوەڕوانکردنی 3 خولەک (180 چرکە) بۆ هەردووکیان
+        # ئەگەر لێنکی تێنەبوو، چاوەڕوانی 3 خولەک (180 چرکە) دەکات
         await asyncio.sleep(180)
         
-        # 3. سڕینەوەی ڤیدیۆ یان وێنەکە لە گرووپ دوای ٣ خولەک
+        # سڕینەوەی میدیاکە لە گرووپ دوای ٣ خولەک
         try:
             await message.delete()
         except Exception as e:
             print(f"هەڵە لە سڕینەوەی پەیام: {e}")
             
-        # 4. ئەگەر ڤیدیۆ بوو، دووبارە دەنێردرێتەوە بۆ هەمان ID (وێنە دوبارە لانێردرێتەوە)
+        # ئەگەر ڤیدیۆ بوو، دووبارە دەنێردرێتەوە بۆ TARGET_CHAT_ID (وێنە دوبارە لانێردرێتەوە)
         if message.video:
             await client.send_video(
                 chat_id=TARGET_CHAT_ID,
