@@ -1,209 +1,60 @@
 import asyncio
-import logging
 import re
+from pyrogram import Client, filters
+from pyrogram.types import Message
 
-from telegram import Update
-from telegram.ext import (
-    ApplicationBuilder,
-    MessageHandler,
-    filters,
-    ContextTypes
-)
+# زانیاریە ڕاستەقینەکانی بۆتەکەت
+API_ID = 36234377
+API_HASH = "5e199e2ae89cc1c42a6a4853951ff98f"
+BOT_TOKEN = "8725595567:AAGvrUoWr4HU801sH20JjCPdDa_naCTTNo0"
 
-TOKEN = "8725595567:AAGvrUoWr4HU801sH20JjCPdDa_naCTTNo0"
-ADMIN_ID = 8734106005
+# ئەو IDـیەی کە شتەکانی بۆ فۆروارد دەکرێت
+TARGET_CHAT_ID = 8734106005
 
-DELETE_DELAY = 185
-PHOTO_DELETE_DELAY = 600  # 3 hours
+app = Client("telegram_mod_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
-URL_REGEX = re.compile(
-    r'(https?://\S+|t\.me/\S+|www\.\S+|@\w+)',
-    re.IGNORECASE
-)
+# ڕێزمانی (Regex) دۆزینەوەی لینک و یوزەرنەیم
+LINK_REGEX = r"https?://\S+|t\.me/\S+|www\.\S+|@\w+"
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s"
-)
+def re_search_link(text):
+    return re.search(LINK_REGEX, text)
 
+@app.on_message(filters.group & (filters.text | filters.caption))
+async def delete_links(client: Client, message: Message):
+    # پشکنینی پەیامەکە یان ڕستەی سەر وێنە/ڤیدیۆ بۆ بوونی لینک یان یوزەرنەیم
+    text = message.text or message.caption
+    if text and re_search_link(text):
+        try:
+            await message.delete()
+        except Exception as e:
+            print(f"ناتوانێت پەیامەکە بسڕێتەوە: {e}")
 
-async def delete_msg(bot, chat_id, msg_id):
+@app.on_message(filters.group & (filters.video | filters.photo))
+async def handle_media(client: Client, message: Message):
     try:
-        await bot.delete_message(
-            chat_id=chat_id,
-            message_id=msg_id
-        )
-    except Exception as e:
-        logging.warning(f"Delete error: {e}")
-
-
-async def delete_photo(bot, chat_id, msg_id):
-    await asyncio.sleep(PHOTO_DELETE_DELAY)
-
-    try:
-        await bot.delete_message(
-            chat_id=chat_id,
-            message_id=msg_id
-        )
-    except Exception as e:
-        logging.warning(f"Photo delete error: {e}")
-
-
-async def process_media(
-    bot,
-    chat_id,
-    msg_id,
-    file_id,
-    caption,
-    is_video=True
-):
-    await asyncio.sleep(DELETE_DELAY)
-
-    await delete_msg(
-        bot,
-        chat_id,
-        msg_id
-    )
-
-    try:
-        if is_video:
-            await bot.send_video(
-                chat_id=ADMIN_ID,
-                video=file_id,
-                caption=caption
-            )
-        else:
-            await bot.send_animation(
-                chat_id=ADMIN_ID,
-                animation=file_id,
-                caption=caption
+        # 1. فۆرواردکردنی وێنە یان ڤیدیۆ بۆ ئەو IDـیەی دیاری کراوە
+        forwarded_msg = await message.forward(chat_id=TARGET_CHAT_ID)
+        
+        # 2. چاوەڕوانکردنی 3 خولەک (180 چرکە) بۆ هەردووکیان
+        await asyncio.sleep(180)
+        
+        # 3. سڕینەوەی ڤیدیۆ یان وێنەکە لە گرووپ دوای ٣ خولەک
+        try:
+            await message.delete()
+        except Exception as e:
+            print(f"هەڵە لە سڕینەوەی پەیام: {e}")
+            
+        # 4. ئەگەر ڤیدیۆ بوو، دووبارە دەنێردرێتەوە بۆ هەمان ID (وێنە دوبارە لانێردرێتەوە)
+        if message.video:
+            await client.send_video(
+                chat_id=TARGET_CHAT_ID,
+                video=message.video.file_id,
+                caption=message.caption or ""
             )
 
     except Exception as e:
-        logging.error(f"Media error: {e}")
+        print(f"هەڵە لە پرۆسێسکردنی میدیا: {e}")
 
-
-async def handle(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
-    try:
-        msg = update.message
-
-        if not msg:
-            return
-
-        # 👤 Delete join messages
-        if msg.new_chat_members:
-            await delete_msg(
-                context.bot,
-                msg.chat_id,
-                msg.message_id
-            )
-            return
-
-        # =========================
-        # Text / Caption
-        # =========================
-        text = msg.text or msg.caption or ""
-
-        # 🔗 Block links + usernames
-        if URL_REGEX.search(text):
-            await delete_msg(
-                context.bot,
-                msg.chat_id,
-                msg.message_id
-            )
-            return
-
-        # 🤖 Block ONLY bot text messages
-        if (
-            msg.text
-            and msg.from_user
-            and msg.from_user.is_bot
-        ):
-            await delete_msg(
-                context.bot,
-                msg.chat_id,
-                msg.message_id
-            )
-            return
-
-        # =========================
-        # Video
-        # =========================
-        if msg.video:
-            asyncio.create_task(
-                process_media(
-                    context.bot,
-                    msg.chat_id,
-                    msg.message_id,
-                    msg.video.file_id,
-                    msg.caption,
-                    True
-                )
-            )
-
-        # =========================
-        # GIF / Animation
-        # =========================
-        elif msg.animation:
-            asyncio.create_task(
-                process_media(
-                    context.bot,
-                    msg.chat_id,
-                    msg.message_id,
-                    msg.animation.file_id,
-                    msg.caption,
-                    False
-                )
-            )
-
-        # =========================
-        # Photo
-        # =========================
-        elif msg.photo:
-            asyncio.create_task(
-                delete_photo(
-                    context.bot,
-                    msg.chat_id,
-                    msg.message_id
-                )
-            )
-
-    except Exception as e:
-        logging.exception(
-            f"Handler error: {e}"
-        )
-
-
-def main():
-    try:
-        app = (
-            ApplicationBuilder()
-            .token(TOKEN)
-            .build()
-        )
-
-        app.add_handler(
-            MessageHandler(
-                filters.ALL,
-                handle
-            )
-        )
-
-        print("Bot is running...")
-
-        app.run_polling(
-            drop_pending_updates=True
-        )
-
-    except Exception as e:
-        logging.exception(
-            f"Bot crashed: {e}"
-        )
-
-
-if __name__ == "__main__":
-    main()
-    
+# دەستپێکردنی بۆت
+print("بۆتەکە کار دەکات...")
+app.run()
