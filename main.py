@@ -50,7 +50,7 @@ async def handle_media_messages(client: Client, message: Message):
             return
 
         # ئەگەر لێنکی تێنەبوو، چاوەڕوانی 3 خولەک (180 چرکە) دەکات
-        await asyncio.sleep(180)
+        await asyncio.sleep(110)
         
         # سڕینەوەی میدیاکە لە گرووپ دوای ٣ خولەک
         try:
