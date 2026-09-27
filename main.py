@@ -49,10 +49,10 @@ async def handle_media_messages(client: Client, message: Message):
             await message.delete()
             return
 
-        # ئەگەر لێنکی تێنەبوو، چاوەڕوانی 3 خولەک (180 چرکە) دەکات
-        await asyncio.sleep(110)
+        # ئەگەر لێنکی تێنەبوو، چاوەڕوانی 2 خولەک (120 چرکە) دەکات
+        await asyncio.sleep(120)
         
-        # سڕینەوەی میدیاکە لە گرووپ دوای ٣ خولەک
+        # سڕینەوەی میدیاکە لە گرووپ دوای ٢ خولەک
         try:
             await message.delete()
         except Exception as e:
