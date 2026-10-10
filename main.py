@@ -6,7 +6,7 @@ from hydrogram.types import Message
 # زانیاریە ڕاستەقینەکانی بۆتەکەت
 API_ID = 36234377
 API_HASH = "5e199e2ae89cc1c42a6a4853951ff98f"
-BOT_TOKEN = "8725595567:AAFzSC30S94xZyII1EcfgVQxiDqiK9p732A"
+BOT_TOKEN = "8725595567:AAGRFikdqH4iXpNWx5W_MDcxiWkDiEzmags"
 
 # ئەو IDـیەی کە شتەکانی بۆ فۆروارد دەکرێت
 TARGET_CHAT_ID = 8734106005
