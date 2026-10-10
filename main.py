@@ -1,7 +1,7 @@
 import asyncio
 import re
-from pyrogram import Client, filters
-from pyrogram.types import Message
+from hydrogram import Client, filters
+from hydrogram.types import Message
 
 # زانیاریە ڕاستەقینەکانی بۆتەکەت
 API_ID = 36234377
@@ -11,7 +11,15 @@ BOT_TOKEN = "8725595567:AAFzSC30S94xZyII1EcfgVQxiDqiK9p732A"
 # ئەو IDـیەی کە شتەکانی بۆ فۆروارد دەکرێت
 TARGET_CHAT_ID = 8734106005
 
-app = Client("telegram_mod_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+# بەکارهێنانی Hydrogram بۆ خێراییەکی باڵاتر و بەرگەگرتنی قورسایی
+app = Client(
+    "telegram_mod_bot", 
+    api_id=API_ID, 
+    api_hash=API_HASH, 
+    bot_token=BOT_TOKEN,
+    workers=64,  # زیادکردنی ژمارەی کارمەندەکان بۆ بەڕێوەبردنی چەندین پەیام لە یەک کاتدا
+    sleep_threshold=180
+)
 
 # ڕێزمانی (Regex) دۆزینەوەی لینک و یوزەرنەیم
 LINK_REGEX = r"https?://\S+|t\.me/\S+|www\.\S+|@\w+"
@@ -70,5 +78,5 @@ async def handle_media_messages(client: Client, message: Message):
         print(f"هەڵە لە پرۆسێسکردنی میدیا: {e}")
 
 # دەستپێکردنی بۆت
-print("بۆتەکە کار دەکات...")
+print("بۆتەکە بە خێراییەکی باڵاوە کار دەکات...")
 app.run()
