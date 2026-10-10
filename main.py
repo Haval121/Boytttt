@@ -6,7 +6,7 @@ from pyrogram.types import Message
 # زانیاریە ڕاستەقینەکانی بۆتەکەت
 API_ID = 36234377
 API_HASH = "5e199e2ae89cc1c42a6a4853951ff98f"
-BOT_TOKEN = "8725595567:AAGvrUoWr4HU801sH20JjCPdDa_naCTTNo0"
+BOT_TOKEN = "8725595567:AAFzSC30S94xZyII1EcfgVQxiDqiK9p732A"
 
 # ئەو IDـیەی کە شتەکانی بۆ فۆروارد دەکرێت
 TARGET_CHAT_ID = 8734106005
