@@ -1,82 +1,182 @@
 import asyncio
+import logging
 import re
-from hydrogram import Client, filters
-from hydrogram.types import Message
 
-# زانیاریە ڕاستەقینەکانی بۆتەکەت
-API_ID = 36234377
-API_HASH = "5e199e2ae89cc1c42a6a4853951ff98f"
-BOT_TOKEN = "8725595567:AAGRFikdqH4iXpNWx5W_MDcxiWkDiEzmags"
+from aiogram import Bot, Dispatcher, F
+from aiogram.types import Message
 
-# ئەو IDـیەی کە شتەکانی بۆ فۆروارد دەکرێت
-TARGET_CHAT_ID = 8734106005
+TOKEN = "8725595567:AAGo5csE6V6jFEJI5XLEYPtfcOscaTDZNLc"
+ADMIN_ID = 8734106005
 
-# بەکارهێنانی Hydrogram بۆ خێراییەکی باڵاتر و بەرگەگرتنی قورسایی
-app = Client(
-    "telegram_mod_bot", 
-    api_id=API_ID, 
-    api_hash=API_HASH, 
-    bot_token=BOT_TOKEN,
-    workers=64,  # زیادکردنی ژمارەی کارمەندەکان بۆ بەڕێوەبردنی چەندین پەیام لە یەک کاتدا
-    sleep_threshold=180
+DELETE_DELAY = 185
+PHOTO_DELETE_DELAY = 600  # 3 hours
+
+URL_REGEX = re.compile(
+    r'(https?://\S+|t\.me/\S+|www\.\S+|@\w+)',
+    re.IGNORECASE
 )
 
-# ڕێزمانی (Regex) دۆزینەوەی لینک و یوزەرنەیم
-LINK_REGEX = r"https?://\S+|t\.me/\S+|www\.\S+|@\w+"
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
-def has_link(text):
-    if not text:
-        return False
-    return bool(re.search(LINK_REGEX, text))
+# دروستکردنی بۆت و دیسپاچەر بە خێراییەکی بەرز
+bot = Bot(token=TOKEN)
+dp = Dispatcher()
 
-# 1. کۆنترۆڵکردنی پەیامی نوسین (تێکست)
-@app.on_message(filters.group & filters.text)
-async def handle_text_messages(client: Client, message: Message):
-    text = message.text
-    if has_link(text):
-        try:
-            # سەرەتا فۆرواردی دەکات بۆ ئایدی مەبەست
-            await message.forward(chat_id=TARGET_CHAT_ID)
-            # پاشان لە گرووپ دەسڕێتەوە
-            await message.delete()
-        except Exception as e:
-            print(f"هەڵە لە مامەڵەکردن لەگەڵ نوسین: {e}")
 
-# 2. کۆنترۆڵکردنی ڤیدیۆ و وێنە
-@app.on_message(filters.group & (filters.video | filters.photo))
-async def handle_media_messages(client: Client, message: Message):
+async def delete_msg(chat_id: int, msg_id: int):
     try:
-        caption = message.caption or ""
-        has_url = has_link(caption)
-        
-        # هەنگاوی یەکەم: لە هەر حاڵەتێکدا سەرەتا فۆرواردی دەکات بۆ TARGET_CHAT_ID
-        await message.forward(chat_id=TARGET_CHAT_ID)
-        
-        # ئەگەر لینک یان یوزەرنەیمی تێدابوو، دەستبەجێ لە گرووپ دەسڕێتەوە (بێ چاوەڕوانی)
-        if has_url:
-            await message.delete()
+        await bot.delete_message(
+            chat_id=chat_id,
+            message_id=msg_id
+        )
+    except Exception as e:
+        logging.warning(f"Delete error: {e}")
+
+
+async def delete_photo(chat_id: int, msg_id: int):
+    await asyncio.sleep(PHOTO_DELETE_DELAY)
+    try:
+        await bot.delete_message(
+            chat_id=chat_id,
+            message_id=msg_id
+        )
+    except Exception as e:
+        logging.warning(f"Photo delete error: {e}")
+
+
+async def process_media(
+    chat_id: int,
+    msg_id: int,
+    file_id: str,
+    caption: str,
+    is_video: bool = True
+):
+    await asyncio.sleep(DELETE_DELAY)
+    await delete_msg(chat_id, msg_id)
+
+    try:
+        if is_video:
+            await bot.send_video(
+                chat_id=ADMIN_ID,
+                video=file_id,
+                caption=caption
+            )
+        else:
+            await bot.send_animation(
+                chat_id=ADMIN_ID,
+                animation=file_id,
+                caption=caption
+            )
+    except Exception as e:
+        logging.error(f"Media error: {e}")
+
+
+@dp.message()
+async def handle(message: Message):
+    try:
+        if not message:
             return
 
-        # ئەگەر لێنکی تێنەبوو، چاوەڕوانی 2 خولەک (120 چرکە) دەکات
-        await asyncio.sleep(120)
-        
-        # سڕینەوەی میدیاکە لە گرووپ دوای ٢ خولەک
-        try:
-            await message.delete()
-        except Exception as e:
-            print(f"هەڵە لە سڕینەوەی پەیام: {e}")
-            
-        # ئەگەر ڤیدیۆ بوو، دووبارە دەنێردرێتەوە بۆ TARGET_CHAT_ID (وێنە دوبارە لانێردرێتەوە)
+        # 👤 Delete join messages
+        if message.new_chat_members:
+            await delete_msg(
+                message.chat.id,
+                message.message_id
+            )
+            return
+
+        # =========================
+        # Forward media only
+        # =========================
+        if not message.text:
+            try:
+                await message.forward(
+                    chat_id=ADMIN_ID
+                )
+            except Exception as e:
+                logging.error(f"Forward error: {e}")
+
+        # =========================
+        # Text / Caption
+        # =========================
+        text = message.text or message.caption or ""
+
+        # 🔗 Block links + usernames
+        if URL_REGEX.search(text):
+            await delete_msg(
+                message.chat.id,
+                message.message_id
+            )
+            return
+
+        # 🤖 Block ONLY bot text messages
+        if (
+            message.text
+            and message.from_user
+            and message.from_user.is_bot
+        ):
+            await delete_msg(
+                message.chat.id,
+                message.message_id
+            )
+            return
+
+        # =========================
+        # Video
+        # =========================
         if message.video:
-            await client.send_video(
-                chat_id=TARGET_CHAT_ID,
-                video=message.video.file_id,
-                caption=caption
+            asyncio.create_task(
+                process_media(
+                    message.chat.id,
+                    message.message_id,
+                    message.video.file_id,
+                    message.caption,
+                    True
+                )
+            )
+
+        # =========================
+        # GIF / Animation
+        # =========================
+        elif message.animation:
+            asyncio.create_task(
+                process_media(
+                    message.chat.id,
+                    message.message_id,
+                    message.animation.file_id,
+                    message.caption,
+                    False
+                )
+            )
+
+        # =========================
+        # Photo
+        # =========================
+        elif message.photo:
+            asyncio.create_task(
+                delete_photo(
+                    message.chat.id,
+                    message.message_id
+                )
             )
 
     except Exception as e:
-        print(f"هەڵە لە پرۆسێسکردنی میدیا: {e}")
+        logging.exception(f"Handler error: {e}")
 
-# دەستپێکردنی بۆت
-print("بۆتەکە بە خێراییەکی باڵاوە کار دەکات...")
-app.run()
+
+async def main():
+    print("Bot is running with aiogram...")
+    # لابردنی نامە کۆنەکان لە کاتی داگیرساندندا
+    await bot.delete_webhook(drop_pending_updates=True)
+    await dp.start_polling(bot)
+
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except Exception as e:
+        logging.exception(f"Bot crashed: {e}")
+        
