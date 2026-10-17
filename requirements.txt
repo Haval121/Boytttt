@@ -1,2 +1,1 @@
-hydrogram
-tgcrypto
+aiogram==3.17.0
