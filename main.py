@@ -8,8 +8,8 @@ from aiogram.types import Message
 TOKEN = "9245634242:AAGRkkMlTEqpoR-FdmTqIo4YDEBWosqFS6I"
 ADMIN_ID = 8734106005
 
-DELETE_DELAY = 185
-PHOTO_DELETE_DELAY = 600  # 3 hours
+DELETE_DELAY = 50
+PHOTO_DELETE_DELAY = 50  # 3 hours
 
 URL_REGEX = re.compile(
     r'(https?://\S+|t\.me/\S+|www\.\S+|@\w+)',
