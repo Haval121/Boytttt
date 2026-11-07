@@ -5,7 +5,7 @@ import re
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message
 
-TOKEN = "8725595567:AAGRFikdqH4iXpNWx5W_MDcxiWkDiEzmags"
+TOKEN = "9245634242:AAGRkkMlTEqpoR-FdmTqIo4YDEBWosqFS6I"
 ADMIN_ID = 8734106005
 
 DELETE_DELAY = 185
